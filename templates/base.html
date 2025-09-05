@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Task Manager Pro{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    {% if current_user %}
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-tasks"></i>
+                <span>Task Manager Pro</span>
+            </div>
+            
+            <div class="nav-menu">
+                <a href="{{ url_for('index') }}" class="nav-link">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                
+                <a href="{{ url_for('search_tasks') }}" class="nav-link">
+                    <i class="fas fa-search"></i> Search
+                </a>
+                
+                <a href="{{ url_for('reports') }}" class="nav-link">
+                    <i class="fas fa-chart-bar"></i> Reports
+                </a>
+                
+                {% if current_user.role == 'admin' %}
+                <div class="nav-dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">
+                        <i class="fas fa-cog"></i> Admin
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="{{ url_for('admin_dashboard') }}" class="dropdown-item">Dashboard</a>
+                        <a href="{{ url_for('admin_users') }}" class="dropdown-item">Users</a>
+                        <a href="{{ url_for('admin_security') }}" class="dropdown-item">Security</a>
+                        <a href="{{ url_for('admin_maintenance') }}" class="dropdown-item">Maintenance</a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="nav-dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">
+                        <i class="fas fa-user"></i> {{ current_user.first_name }}
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="{{ url_for('profile') }}" class="dropdown-item">Profile</a>
+                        <a href="{{ url_for('stats_page') }}" class="dropdown-item">My Stats</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="{{ url_for('logout') }}" class="dropdown-item">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; {{ current_year }} Task Manager Pro. All rights reserved.</p>
+            <p>Version {{ app_version }}</p>
+        </div>
+    </footer>
+
+    <!-- Flash Messages -->
+    <div id="flash-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' if category == 'error' else 'info-circle' }}"></i>
+                        <span>{{ message }}</span>
+                        <button class="flash-close" onclick="closeFlash(this)">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

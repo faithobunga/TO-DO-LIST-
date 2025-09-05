@@ -1,0 +1,732 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Task Manager Pro{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="welcome-section">
+            <h1>Welcome back, {{ current_user.first_name }}! 👋</h1>
+            <p>Here's what's happening with your tasks today.</p>
+        </div>
+        
+        <div class="quick-actions">
+            <button class="btn btn-primary" onclick="showTaskModal()">
+                <i class="fas fa-plus"></i> Add Task
+            </button>
+            <a href="{{ url_for('search_tasks') }}" class="btn btn-secondary">
+                <i class="fas fa-search"></i> Search
+            </a>
+            <a href="{{ url_for('reports') }}" class="btn btn-info">
+                <i class="fas fa-chart-bar"></i> Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="stats-overview">
+        <div class="stat-card total">
+            <div class="stat-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.total_tasks }}</h3>
+                <p>Total Tasks</p>
+            </div>
+        </div>
+        
+        <div class="stat-card pending">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.pending_tasks }}</h3>
+                <p>Pending</p>
+            </div>
+        </div>
+        
+        <div class="stat-card progress">
+            <div class="stat-icon">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.in_progress_tasks }}</h3>
+                <p>In Progress</p>
+            </div>
+        </div>
+        
+        <div class="stat-card completed">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.completed_tasks }}</h3>
+                <p>Completed</p>
+            </div>
+        </div>
+        
+        {% if stats.overdue_tasks > 0 %}
+        <div class="stat-card overdue">
+            <div class="stat-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.overdue_tasks }}</h3>
+                <p>Overdue</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="stat-card completion">
+            <div class="stat-icon">
+                <i class="fas fa-chart-pie"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.completion_rate }}%</h3>
+                <p>Completion Rate</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overdue Tasks Alert -->
+    {% if overdue_tasks %}
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Attention Required!</strong> 
+            You have {{ overdue_tasks|length }} overdue task(s). 
+            <a href="{{ url_for('search_tasks') }}?status=overdue" class="alert-link">
+                View overdue tasks <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+        <button class="alert-close" onclick="this.parentElement.style.display='none'">&times;</button>
+    </div>
+    {% endif %}
+
+    <!-- Main Content Grid -->
+    <div class="dashboard-grid">
+        <!-- Tasks Section -->
+        <div class="tasks-section">
+            <!-- Filters and Search -->
+            <div class="section-header">
+                <h2><i class="fas fa-list"></i> Your Tasks</h2>
+                <div class="section-actions">
+                    <button class="btn btn-sm btn-outline" onclick="refreshTasks()">
+                        <i class="fas fa-refresh"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="task-filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <input type="text" 
+                               id="taskSearch" 
+                               class="form-control" 
+                               placeholder="Search tasks..."
+                               onkeyup="searchTasks()">
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select id="statusFilter" class="form-control" onchange="filterTasks()">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select id="priorityFilter" class="form-control" onchange="filterTasks()">
+                            <option value="">All Priorities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select id="categoryFilter" class="form-control" onchange="filterTasks()">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-sm btn-secondary" onclick="clearFilters()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tasks Grid -->
+            <div class="tasks-grid" id="tasksContainer">
+                {% for task in tasks %}
+                <div class="task-card {{ task.status }} {% if task.due_date and task.due_date < now().strftime('%Y-%m-%d') and task.status != 'completed' %}overdue{% endif %}"
+                     data-task-id="{{ task.id }}"
+                     data-status="{{ task.status }}"
+                     data-priority="{{ task.priority }}"
+                     data-category="{{ task.category_id or '' }}"
+                     data-title="{{ task.title.lower() }}"
+                     data-description="{{ (task.description or '').lower() }}">
+                    
+                    <div class="task-header">
+                        <div class="task-priority priority-{{ task.priority }}">
+                            <i class="fas fa-flag"></i>
+                            <span>{{ task.priority.title() }}</span>
+                        </div>
+                        
+                        <div class="task-status status-{{ task.status }}">
+                            {% if task.status == 'pending' %}
+                                <i class="fas fa-clock"></i>
+                            {% elif task.status == 'in_progress' %}
+                                <i class="fas fa-spinner fa-spin"></i>
+                            {% elif task.status == 'completed' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% endif %}
+                            <span>{{ task.status.replace('_', ' ').title() }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="task-content">
+                        <h3 class="task-title">
+                            <a href="{{ url_for('task_details', task_id=task.id) }}">
+                                {{ task.title }}
+                            </a>
+                        </h3>
+                        
+                        {% if task.description %}
+                        <p class="task-description">
+                            {{ task.description[:100] }}{% if task.description|length > 100 %}...{% endif %}
+                        </p>
+                        {% endif %}
+                        
+                        <div class="task-meta">
+                            {% if task.category_name %}
+                            <span class="task-category" style="color: {{ task.color_code or '#667eea' }}">
+                                <i class="fas fa-tag"></i> {{ task.category_name }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if task.due_date %}
+                            <span class="task-due-date {% if task.due_date < now().strftime('%Y-%m-%d') and task.status != 'completed' %}overdue{% endif %}">
+                                <i class="fas fa-calendar-alt"></i> 
+                                Due: {{ task.due_date }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if task.assigned_username %}
+                            <span class="task-assignee">
+                                <i class="fas fa-user"></i> {{ task.assigned_username }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="task-timestamps">
+                            <small>Created: {{ task.created_at[:10] }}</small>
+                            {% if task.updated_at != task.created_at %}
+                            <small>Updated: {{ task.updated_at[:10] }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="task-actions">
+                        {% if task.status == 'pending' %}
+                            <button class="btn btn-sm btn-warning" onclick="updateTaskStatus({{ task.id }}, 'in_progress')">
+                                <i class="fas fa-play"></i> Start
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="updateTaskStatus({{ task.id }}, 'completed')">
+                                <i class="fas fa-check"></i> Complete
+                            </button>
+                        {% elif task.status == 'in_progress' %}
+                            <button class="btn btn-sm btn-success" onclick="updateTaskStatus({{ task.id }}, 'completed')">
+                                <i class="fas fa-check"></i> Complete
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="updateTaskStatus({{ task.id }}, 'pending')">
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                        {% else %}
+                            <button class="btn btn-sm btn-warning" onclick="updateTaskStatus({{ task.id }}, 'pending')">
+                                <i class="fas fa-undo"></i> Reopen
+                            </button>
+                        {% endif %}
+                        
+                        <button class="btn btn-sm btn-primary" onclick="editTask({{ task.id }})">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        
+                        {% if users_for_assignment %}
+                        <button class="btn btn-sm btn-info" onclick="assignTask({{ task.id }})">
+                            <i class="fas fa-user-plus"></i> Assign
+                        </button>
+                        {% endif %}
+                        
+                        <button class="btn btn-sm btn-danger" onclick="deleteTask({{ task.id }})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if not tasks %}
+            <div class="empty-state">
+                <i class="fas fa-tasks"></i>
+                <h3>No tasks yet!</h3>
+                <p>Create your first task to get started with better productivity.</p>
+                <button class="btn btn-primary" onclick="showTaskModal()">
+                    <i class="fas fa-plus"></i> Create First Task
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="dashboard-sidebar">
+            <!-- Today's Focus -->
+            <div class="sidebar-widget">
+                <h3><i class="fas fa-bullseye"></i> Today's Focus</h3>
+                <div class="focus-list">
+                    {% for task in tasks[:3] if task.status != 'completed' %}
+                    <div class="focus-item priority-{{ task.priority }}">
+                        <div class="focus-priority"></div>
+                        <div class="focus-content">
+                            <strong>{{ task.title }}</strong>
+                            {% if task.due_date %}
+                            <small>Due: {{ task.due_date }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not (tasks[:3] | selectattr('status', 'ne', 'completed') | list) %}
+                    <div class="focus-empty">
+                        <p>Great! No urgent tasks today.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="sidebar-widget">
+                <h3><i class="fas fa-tags"></i> Categories</h3>
+                <div class="category-list">
+                    {% for category in categories %}
+                    <div class="category-item" onclick="filterByCategory({{ category.id }})">
+                        <div class="category-color" style="background-color: {{ category.color_code }}"></div>
+                        <span class="category-name">{{ category.name }}</span>
+                        <span class="category-count">
+                            {{ tasks | selectattr('category_id', 'equalto', category.id) | list | length }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="sidebar-widget">
+                <h3><i class="fas fa-chart-line"></i> Quick Stats</h3>
+                <div class="quick-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">This Week:</span>
+                        <span class="stat-value">{{ stats.completed_tasks }} completed</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Average per day:</span>
+                        <span class="stat-value">{{ (stats.completed_tasks / 7) | round(1) }} tasks</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Productivity:</span>
+                        <span class="stat-value">{{ stats.completion_rate }}%</span>
+                    </div>
+                </div>
+                <a href="{{ url_for('stats_page') }}" class="btn btn-sm btn-outline">
+                    <i class="fas fa-chart-bar"></i> View Details
+                </a>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="sidebar-widget">
+                <h3><i class="fas fa-history"></i> Recent Activity</h3>
+                <div class="activity-list">
+                    {% for task in tasks[:5] if task.updated_at %}
+                    <div class="activity-item">
+                        <div class="activity-icon status-{{ task.status }}">
+                            {% if task.status == 'completed' %}
+                                <i class="fas fa-check"></i>
+                            {% elif task.status == 'in_progress' %}
+                                <i class="fas fa-play"></i>
+                            {% else %}
+                                <i class="fas fa-plus"></i>
+                            {% endif %}
+                        </div>
+                        <div class="activity-content">
+                            <p>{{ task.title[:30] }}{% if task.title|length > 30 %}...{% endif %}</p>
+                            <small>{{ task.updated_at[:16] }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Task Modal -->
+<div id="taskModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle"><i class="fas fa-plus"></i> Add New Task</h2>
+            <button class="modal-close" onclick="closeTaskModal()">&times;</button>
+        </div>
+
+        <form id="taskForm" method="POST" action="{{ url_for('add_task') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" id="taskId" name="task_id" value="">
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="taskTitle">
+                        <i class="fas fa-heading"></i> Task Title *
+                    </label>
+                    <input type="text" 
+                           id="taskTitle" 
+                           name="title" 
+                           class="form-control" 
+                           placeholder="Enter task title"
+                           required 
+                           maxlength="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="taskDescription">
+                        <i class="fas fa-align-left"></i> Description
+                    </label>
+                    <textarea id="taskDescription" 
+                              name="description" 
+                              class="form-control" 
+                              rows="3" 
+                              placeholder="Enter task description"
+                              maxlength="500"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskCategory">
+                            <i class="fas fa-tag"></i> Category
+                        </label>
+                        <select id="taskCategory" name="category_id" class="form-control">
+                            <option value="">Select Category</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskPriority">
+                            <i class="fas fa-flag"></i> Priority
+                        </label>
+                        <select id="taskPriority" name="priority" class="form-control">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="taskDueDate">
+                        <i class="fas fa-calendar-alt"></i> Due Date
+                    </label>
+                    <input type="date" 
+                           id="taskDueDate" 
+                           name="due_date" 
+                           class="form-control">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Task
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Assignment Modal -->
+{% if users_for_assignment %}
+<div id="assignModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-user-plus"></i> Assign Task</h2>
+            <button class="modal-close" onclick="closeAssignModal()">&times;</button>
+        </div>
+
+        <form id="assignForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="assignTo">
+                        <i class="fas fa-user"></i> Assign To *
+                    </label>
+                    <select id="assignTo" name="assigned_to" class="form-control" required>
+                        <option value="">Select User</option>
+                        {% for user in users_for_assignment %}
+                        <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="assignDueDate">
+                        <i class="fas fa-calendar-alt"></i> Due Date
+                    </label>
+                    <input type="date" id="assignDueDate" name="due_date" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="assignPriority">
+                        <i class="fas fa-flag"></i> Priority
+                    </label>
+                    <select id="assignPriority" name="priority" class="form-control">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Assign Task
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Floating Add Button -->
+<button class="floating-add-btn" onclick="showTaskModal()" title="Add New Task">
+    <i class="fas fa-plus"></i>
+</button>
+
+<script>
+// Global variables
+let currentEditTaskId = null;
+
+// Task management functions
+function showTaskModal(isEdit = false) {
+    const modal = document.getElementById('taskModal');
+    const title = document.getElementById('modalTitle');
+    const form = document.getElementById('taskForm');
+    
+    if (isEdit) {
+        title.innerHTML = '<i class="fas fa-edit"></i> Edit Task';
+        form.action = `/edit_task/${currentEditTaskId}`;
+    } else {
+        title.innerHTML = '<i class="fas fa-plus"></i> Add New Task';
+        form.action = '{{ url_for("add_task") }}';
+        form.reset();
+        document.getElementById('taskId').value = '';
+    }
+    
+    modal.style.display = 'block';
+    document.getElementById('taskTitle').focus();
+}
+
+function closeTaskModal() {
+    document.getElementById('taskModal').style.display = 'none';
+    currentEditTaskId = null;
+}
+
+function editTask(taskId) {
+    currentEditTaskId = taskId;
+    
+    // Get task data from the card
+    const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+    const title = taskCard.querySelector('.task-title a').textContent.trim();
+    const description = taskCard.querySelector('.task-description')?.textContent.trim() || '';
+    
+    // Populate form
+    document.getElementById('taskTitle').value = title;
+    document.getElementById('taskDescription').value = description;
+    
+    showTaskModal(true);
+}
+
+function assignTask(taskId) {
+    const modal = document.getElementById('assignModal');
+    const form = document.getElementById('assignForm');
+    form.action = `/assign_task/${taskId}`;
+    modal.style.display = 'block';
+}
+
+function closeAssignModal() {
+    document.getElementById('assignModal').style.display = 'none';
+}
+
+function updateTaskStatus(taskId, status) {
+    if (confirm(`Are you sure you want to mark this task as ${status.replace('_', ' ')}?`)) {
+        window.location.href = `/update_status/${taskId}/${status}`;
+    }
+}
+
+function deleteTask(taskId) {
+    if (confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+        window.location.href = `/delete_task/${taskId}`;
+    }
+}
+
+// Search and filter functions
+function searchTasks() {
+    const searchTerm = document.getElementById('taskSearch').value.toLowerCase();
+    const tasks = document.querySelectorAll('.task-card');
+    
+    tasks.forEach(task => {
+        const title = task.dataset.title;
+        const description = task.dataset.description;
+        
+        if (title.includes(searchTerm) || description.includes(searchTerm)) {
+            task.style.display = 'block';
+        } else {
+            task.style.display = 'none';
+        }
+    });
+}
+
+function filterTasks() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const priorityFilter = document.getElementById('priorityFilter').value;
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const tasks = document.querySelectorAll('.task-card');
+    
+    tasks.forEach(task => {
+        let show = true;
+        
+        if (statusFilter && task.dataset.status !== statusFilter) {
+            show = false;
+        }
+        
+        if (priorityFilter && task.dataset.priority !== priorityFilter) {
+            show = false;
+        }
+        
+        if (categoryFilter && task.dataset.category !== categoryFilter) {
+            show = false;
+        }
+        
+        task.style.display = show ? 'block' : 'none';
+    });
+}
+
+function filterByCategory(categoryId) {
+    document.getElementById('categoryFilter').value = categoryId;
+    filterTasks();
+}
+
+function clearFilters() {
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('priorityFilter').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('taskSearch').value = '';
+    
+    const tasks = document.querySelectorAll('.task-card');
+    tasks.forEach(task => {
+        task.style.display = 'block';
+    });
+}
+
+function refreshTasks() {
+    window.location.reload();
+}
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date for due date inputs
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('taskDueDate').setAttribute('min', today);
+    
+    // Auto-refresh stats every 30 seconds
+    setInterval(refreshStats, 30000);
+});
+
+function refreshStats() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateStatsDisplay(data.stats);
+            }
+        })
+        .catch(error => console.error('Error refreshing stats:', error));
+}
+
+function updateStatsDisplay(stats) {
+    // Update stat cards
+    const statCards = document.querySelectorAll('.stat-card');
+    statCards.forEach(card => {
+        const content = card.querySelector('.stat-content h3');
+        if (card.classList.contains('total')) {
+            content.textContent = stats.total_tasks;
+        } else if (card.classList.contains('pending')) {
+            content.textContent = stats.pending_tasks;
+        } else if (card.classList.contains('progress')) {
+            content.textContent = stats.in_progress_tasks;
+        } else if (card.classList.contains('completed')) {
+            content.textContent = stats.completed_tasks;
+        } else if (card.classList.contains('completion')) {
+            content.textContent = stats.completion_rate + '%';
+        }
+    });
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const taskModal = document.getElementById('taskModal');
+    const assignModal = document.getElementById('assignModal');
+    
+    if (event.target === taskModal) {
+        closeTaskModal();
+    }
+    if (event.target === assignModal) {
+        closeAssignModal();
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl+N for new task
+    if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        showTaskModal();
+    }
+    
+    // Escape to close modals
+    if (e.key === 'Escape') {
+        closeTaskModal();
+        closeAssignModal();
+    }
+    
+    // Ctrl+F for search
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('taskSearch').focus();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Task Manager Pro{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Admin Header -->
+    <div class="admin-header">
+        <div class="admin-welcome">
+            <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
+            <p>System overview and management tools</p>
+        </div>
+        
+        <div class="admin-actions">
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="{{ url_for('admin_security') }}" class="btn btn-warning">
+                <i class="fas fa-shield-alt"></i> Security
+            </a>
+            <a href="{{ url_for('admin_maintenance') }}" class="btn btn-info">
+                <i class="fas fa-tools"></i> Maintenance
+            </a>
+        </div>
+    </div>
+
+    <!-- System Statistics -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card total-tasks">
+            <div class="stat-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div class="stat-details">
+                <h3>{{ stats.total_tasks }}</h3>
+                <p>Total Tasks</p>
+                <small>{{ stats.completed_tasks }} completed</small>
+            </div>
+        </div>
+        
+        <div class="admin-stat-card total-users">
+            <div class="stat-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-details">
+                <h3>{{ users|length }}</h3>
+                <p>Total Users</p>
+                <small>{{ users | selectattr('is_active', 'equalto', 1) | list | length }} active</small>
+            </div>
+        </div>
+        
+        <div class="admin-stat-card overdue-tasks">
+            <div class="stat-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-details">
+                <h3>{{ overdue_tasks|length }}</h3>
+                <p>Overdue Tasks</p>
+                <small>Require attention</small>
+            </div>
+        </div>
+        
+        <div class="admin-stat-card completion-rate">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-details">
+                <h3>{{ stats.completion_rate }}%</h3>
+                <p>Completion Rate</p>
+                <small>System average</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="admin-content-grid">
+        <!-- Recent Activity -->
+        <div class="admin-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-history"></i> Recent Activity</h2>
+                <a href="{{ url_for('admin_security') }}" class="btn btn-sm btn-outline">
+                    View All <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            <div class="activity-timeline">
+                {% for activity in activities[:10] %}
+                <div class="timeline-item">
+                    <div class="timeline-marker activity-{{ activity.action.lower() }}">
+                        {% if 'login' in activity.action.lower() %}
+                            <i class="fas fa-sign-in-alt"></i>
+                        {% elif 'task' in activity.action.lower() %}
+                            <i class="fas fa-tasks"></i>
+                        {% elif 'user' in activity.action.lower() %}
+                            <i class="fas fa-user"></i>
+                        {% else %}
+                            <i class="fas fa-cog"></i>
+                        {% endif %}
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-header">
+                            <strong>{{ activity.username or 'System' }}</strong>
+                            <span class="timeline-action">{{ activity.action.replace('_', ' ').title() }}</span>
+                        </div>
+                        <div class="timeline-details">
+                            {% if activity.details %}
+                                {{ activity.details }}
+                            {% endif %}
+                            {% if activity.ip_address %}
+                                <span class="ip-address">{{ activity.ip_address }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-time">
+                            {{ activity.timestamp[:16] }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {% if not activities %}
+                <div class="no-activity">
+                    <i class="fas fa-history"></i>
+                    <p>No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- System Health -->
+        <div class="admin-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-heartbeat"></i> System Health</h2>
+                <span class="status-indicator status-healthy">
+                    <i class="fas fa-circle
